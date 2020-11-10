@@ -184,12 +184,11 @@ def SubmitBatchJob(Job,RunType='mpirun python2',Nodes=32,Memory=7000,Queue='psne
     for line in Job:
         bfile.write("%s \n" % line)
     bfile.close()
-
+    
     # Execute batch command
     BatchCommand="ssh psana \'bsub -n %d -R \"rusage[mem=%d]\" -q %s -o %s %s/Libraries/pythonBatchMagic/BatchWrapper.sh %s %s\'" % \
                                         (Nodes,Memory,Queue,OutputTo,os.environ['INSTALLPATH'],RunType,BatchFileName)
 
-#     print(BatchCommand)
 
     print "Submitting: "+BatchCommand
     process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
@@ -252,7 +251,8 @@ class batchThread (threading.Thread):
 
         # Specify job and batch job parameters
         self.Job = Job
-        self.RunType = 'mpirun python2'
+#         self.RunType = 'mpirun python2'
+        self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
         self.Queue = 'psnehq'
@@ -266,7 +266,7 @@ class batchThread (threading.Thread):
 
     def run(self):
         self.status = 'Running'
-
+        
         self.jobid = SubmitBatchJob(self.Job ,
                                    RunType=self.RunType,
                                    Nodes=self.Nodes,

@@ -1,3 +1,3 @@
 #!/bin/bash
-source ~/.bashrc
+source /cds/group/psdm/etc/psconda.sh
 $@ batch.py

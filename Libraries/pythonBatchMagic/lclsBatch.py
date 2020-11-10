@@ -109,10 +109,6 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
 
     # Create empty dictionary to store
     detArrays = { name:np.zeros((eventMax,1)) for name in detList }
-    with open(os.environ['INSTALLPATH']+'/output.txt',w) as f:
-        f.write('well hello there\n')
-        for name in detArrays.keys():
-            f.write(name+'\n')
 
     # for each detector (named), use .sum(evt) to grab data stored
     # store that in the dictionary
@@ -135,7 +131,6 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
                                                                      seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
 
     save_obj( detArrays , BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run) )
-
 
 
 # thread for submitted
