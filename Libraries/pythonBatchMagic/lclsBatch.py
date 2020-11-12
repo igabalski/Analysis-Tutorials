@@ -459,7 +459,7 @@ class batchCSPADGrabber (threading.Thread):
 # CSPAD grabber (mean and variance done in different batch jobs)
 #################################################################################################
 
-def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72):
+def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CSPAD'):
     tagDict = load_obj( BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,runNumber) )
     seconds, nanoseconds, fiducials = tagDict['seconds'], tagDict['nanoseconds'], tagDict['fiducials']
 
@@ -467,18 +467,23 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72):
     run = ds.runs().next()
 
 
-    cspadMask = createMask( experiment=experiment , run=runNumber).astype(bool)
+    cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
 
-    integratedCSPAD = np.zeros((32,185,388))
+    if detType =='CSPAD':
+        integratedCSPAD = np.zeros((32,185,388))
+    elif detType =='Jungfrau':
+        integratedCSPAD = np.zeros((8,512,1024))
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
     count = 0
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
         evt = run.event(et)
         currCSPAD = getCSPAD(evt, run=runNumber, experiment=experiment,
-                             seconds=sec, nanoseconds=nsec, fiducials=fid)
+                             seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
 #         ipmIntensity = getIPM(evt,run=runNumber, experiment=experiment,
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
-        ipmIntensity = sumCSPAD( currCSPAD , cspadMask )
+        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
                 integratedCSPAD += currCSPAD / ipmIntensity
                 count += 1
@@ -487,16 +492,23 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72):
 
     ds = DataSource('exp=%s:run=%d:idx' % (experiment, runNumber))
     run = ds.runs().next()
-    varianceCSPAD = np.zeros((32,185,388))
+    
+    if detType =='CSPAD':
+        varianceCSPAD = np.zeros((32,185,388))
+    elif detType =='Jungfrau':
+        varianceCSPAD = np.zeros((8,512,1024))
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     count = 0
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
         evt = run.event(et)
         currCSPAD = getCSPAD(evt, run=runNumber, experiment=experiment,
-                              seconds=sec, nanoseconds=nsec, fiducials=fid)
+                              seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
 #         ipmIntensity = getIPM(evt, run=runNumber, experiment=experiment,
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
-        ipmIntensity = sumCSPAD( currCSPAD , cspadMask )
+        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
             varianceCSPAD += (currCSPAD / ipmIntensity - mean)**2
             count += 1
@@ -511,7 +523,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72):
 
 # thread for submitted
 class batchCSPADMVGrabber (threading.Thread):
-    def __init__(self, tagsList, experiment='xppl2816', runNumber=74):
+    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD'):
         threading.Thread.__init__(self)
 
         # Specify function parameters
@@ -533,9 +545,16 @@ class batchCSPADMVGrabber (threading.Thread):
         self.flag = None
 
         # Save the final output
+        self.detType = detType
         NT = len( tagsList )
-        self.CSPAD = np.zeros((32,185,388,NT))
-        self.variance = np.zeros((32,185,388,NT))
+        if detType == 'CSPAD':
+            self.CSPAD = np.zeros((32,185,388,NT))
+            self.variance = np.zeros((32,185,388,NT))
+        elif detType =='Jungfrau':
+            self.CSPAD = np.zeros((8,512,1024,NT))
+            self.variance = np.zeros((8,512,1024,NT))
+        else:
+            raise ValueError('detType must be CSPAD or Jungfrau')
         self.counts = np.zeros((NT,1))
 
 
@@ -562,7 +581,7 @@ class batchCSPADMVGrabber (threading.Thread):
                         'import sys',
                         'sys.path.insert(0, os.environ[\'INSTALLPATH\']+\'/Libraries/pythonBatchMagic\')',
                         'from lclsBatch import *',
-                        'batchMeanVarCSPAD( node=%d, experiment=\'%s\', runNumber=%d )' % (node, self.experiment,self.runNumber)]
+                        'batchMeanVarCSPAD( node=%d, experiment=\'%s\', runNumber=%d,detType=\'%s\' )' % (node, self.experiment,self.runNumber,self.detType)]
             self.submitBatch( batchJobCV , self.OutputName+'CSPAD-%d' % node )
 
             time.sleep(1)

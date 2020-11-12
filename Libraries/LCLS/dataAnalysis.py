@@ -454,7 +454,7 @@ def getDefault( evt, det, run=74, experiment='xppl2816', seconds=None, nanosecon
         return None
 
 # @memorizeGet
-def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='CSPAD' ):
     '''
     Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
     
@@ -465,10 +465,15 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau':
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
-        return det.calib(evt)
+        return det.raw(evt)
     except Exception:
         return None
 
@@ -525,7 +530,12 @@ def getCSPADcoords( evt, det = None, run=74, experiment='xppl2816', seconds=None
     '''
     if det is None:
         det = Detector('cspad')
+    elif det is 'CSPAD':
+        det = Detector('cspad')
+    elif det is 'Jungfrau':
+        det = Detector('jungfrau4M')
     return det.coords_x(evt) , det.coords_y(evt)
+
 
 #################################################################################################
 # Collect point data from run
@@ -678,41 +688,57 @@ def runFilter( pointData, filterOn = ['xint3','ebeamcharge','fltposfwhm'], madde
 # CSPAD plotting
 #################################################################################################
         
-def sumCSPAD( cspad, cspadMask=None ):
+def sumCSPAD( cspad, cspadMask=None, detType ='CSPAD' ):
     if cspadMask is None:
-        cspadMask = createMask().astype(bool)
+        cspadMask = createMask(detType=detType).astype(bool)
         
     theSum = 0 
-    for iTile in range(32):
+    if detType == 'CSPAD':
+        NTILE = 32
+    elif detType == 'Jungfrau':
+        NTILE = 8
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
+    for iTile in range(NTILE):
         cspadTile = cspad[iTile,:,:]
         tileMask = cspadMask[iTile,:,:]
         theSum += np.sum(cspadTile[tileMask].flatten())      
         
     return theSum
 
-def CSPADgeometry( experiment='xppl2816' , run=72 ):
+def CSPADgeometry( experiment='xppl2816' , run=72, detType = 'CSPAD' ):
     """
     Outputs x,y pixel coords of CSPAD
     """
     ds = DataSource('exp=%s:run=%d:smd' % (experiment, run))
     evt0 = ds.events().next()
-    return getCSPADcoords(evt0)
+    return getCSPADcoords(evt0, det = detType,  experiment=experiment , run=run)
 
 #################################################################################################
 # CSPAD mask generation
 #################################################################################################
         
-def createMask( experiment='xppl2816' , run=72 ):
+def createMask( experiment='xppl2816' , run=72, detType ='CSPAD' ):
     """
     Generates a mask of the CSPAD using a combination of the bad tiles, edges, and unbonded pixels.
     Also includes neighbors of the above.
     """
+    print(experiment,run)
     ds = DataSource('exp=%s:run=%d:smd' % (experiment, run))
     evt0 = ds.events().next()
-    CSPADStream=Detector( 'cspad' )
+    if detType == 'CSPAD':
+        detName = 'cspad'
+    elif detType == 'Jungfrau':
+        detName = 'jungfrau4M'
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
+    CSPADStream=Detector( detName )
     CSPAD_mask_geo=CSPADStream.mask_comb(evt0,mbits=37)
     CSPAD_mask_bad_pixels=np.multiply(CSPAD_mask_geo,CSPADStream.mask_geo(evt0,mbits=15))
     CSPAD_mask_edges=CSPADStream.mask_edges(CSPAD_mask_bad_pixels,mrows=4,mcols=4)
+    
     return CSPAD_mask_edges
 
 
