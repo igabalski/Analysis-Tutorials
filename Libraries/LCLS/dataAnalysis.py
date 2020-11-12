@@ -349,29 +349,6 @@ def getIPM( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanose
     except Exception:
         return None
 
-# @memorizeGet
-'''
-old method, old detector ID
-def getXrayEnergy( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
-    
-    Description: This function takes detector and event. Returns the intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Intensity (float)
-    
-    if det is None:
-        det = Detector('SIOC:SYS0:ML00:AO541')
-    
-    try:
-        return det(evt)
-    except Exception:
-        return None
-'''
-
 # current detector ID
 def getXrayEnergy( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
     '''
