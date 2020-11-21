@@ -365,7 +365,9 @@ def getXrayEnergy( evt, det = None, run=74, experiment='xppl2816', seconds=None,
         det = Detector('FEEGasDetEnergy')
     
     try:
-        return det(evt)
+        # This is the energy after attenuation
+        # Type help(det.get(evt)) in detectors.ipynb to see other options
+        return det.get(evt).f_21_ENRC()
     except Exception:
         return None
 
@@ -450,7 +452,7 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         raise ValueError('detType must be CSPAD or Jungfrau')
         
     try:
-        return det.raw(evt)
+        return det.calib(evt)
     except Exception:
         return None
 
@@ -466,8 +468,12 @@ def getCSPADsum( evt, det = None, run=74, experiment='xppl2816', seconds=None, n
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau':
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
     try:
         return np.nansum(det.calib(evt).flatten())
     except Exception:
@@ -485,8 +491,12 @@ def getCSPADmedian( evt, det = None, run=74, experiment='xppl2816', seconds=None
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau':
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
     try:
         return np.nanmedian(det.calib(evt).flatten())
     except Exception:
