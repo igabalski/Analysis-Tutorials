@@ -257,9 +257,12 @@ class batchPointDataGrabber (threading.Thread):
     def gather(self):
         self.detArrays = load_obj( BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (0,self.runNumber) )
         for node in range(1,self.batchRank):
-            detArrays0 = load_obj( BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node, self.runNumber) )
-            for key in self.detArrays.keys():
-                self.detArrays[key] += detArrays0[key]
+            try:
+                detArrays0 = load_obj( BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node, self.runNumber) )
+                for key in self.detArrays.keys():
+                    self.detArrays[key] += detArrays0[key]
+            except Exception as e:
+                pass
 
 
 
@@ -536,7 +539,7 @@ class batchCSPADMVGrabber (threading.Thread):
         self.RunType = 'mpirun python2'
         self.Nodes = 1
         self.Memory = 7000
-        self.Queue = 'psnehq'
+        self.Queue = 'psanaq'
         self.OutputName = 'CSPADMV-run-%d-temp-' % runNumber
 
         # Save internally the batch job ids and run status
