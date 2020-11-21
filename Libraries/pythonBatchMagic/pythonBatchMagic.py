@@ -129,6 +129,8 @@ except KeyError as e:
     raise e
 
 currentUser, error = unixCMD("echo $USER")
+while len(currentUser)==0:
+    currentUser, error = unixCMD("echo $USER")
 currentUser = currentUser.strip()
 print('Current user is '+currentUser+' will output batch to '+os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser)
 BATCHDIR = os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser
