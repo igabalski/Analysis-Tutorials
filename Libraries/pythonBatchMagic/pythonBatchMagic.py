@@ -100,7 +100,7 @@ def extractJobId(batchOutput):
     Outputs:
         jobid (string)
     '''
-    m = re.search('<\d\d\d\d\d\d>', batchOutput)
+    m = re.search('<\d*\d>', batchOutput)
     return m.group(0)[1:-1]
 
 def checkjobstatus():
@@ -153,7 +153,7 @@ if not os.path.isdir(os.environ['OUTPUTPATH']+'/%s/Batch/Python'% currentUser):
 # Submit batch job function
 #################################################################################################
 
-def SubmitBatchJob(Job,RunType='mpirun python2',Nodes=32,Memory=7000,Queue='psnehprioq',OutputName='temp'):
+def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psanaq',OutputName='temp'):
     '''
     Description: Submits a batch job from within python
 
@@ -257,7 +257,7 @@ class batchThread (threading.Thread):
         self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
-        self.Queue = 'psnehq'
+        self.Queue = 'psanaq'
         self.OutputName = 'temp'
 
         # Save internally the batch job id and run status
