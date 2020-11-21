@@ -433,7 +433,7 @@ def getDefault( evt, det, run=74, experiment='xppl2816', seconds=None, nanosecon
         return None
 
 # @memorizeGet
-def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='CSPAD' ):
+def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='Jungfrau' ):
     '''
     Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
     
@@ -450,9 +450,9 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         det = Detector('jungfrau4M')
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
-        
     try:
-        return det.calib(evt)
+        output = det.raw(evt)
+        return output
     except Exception:
         return None
 
@@ -605,8 +605,8 @@ def meanCSPAD(seconds, nanoseconds, fiducials, experiment = 'xppl2816', runNumbe
         ipmIntensity = getIPM(evt,run=runNumber, experiment=experiment,
                               seconds=sec, nanoseconds=nsec, fiducials=fid)
         if currCSPAD is not None and ipmIntensity is not None:
-                integratedCSPAD += currCSPAD / ipmIntensity
-                count += 1
+            integratedCSPAD += currCSPAD / ipmIntensity
+            count += 1
     return integratedCSPAD/count, count
 
 def varianceCSPAD(mean, seconds, nanoseconds, fiducials, experiment = 'xppl2816', runNumber = 72):
@@ -675,7 +675,7 @@ def runFilter( pointData, filterOn = ['xint3','ebeamcharge','fltposfwhm'], madde
 # CSPAD plotting
 #################################################################################################
         
-def sumCSPAD( cspad, cspadMask=None, detType ='CSPAD' ):
+def sumCSPAD( cspad, cspadMask=None, detType ='Jungfrau' ):
     if cspadMask is None:
         cspadMask = createMask(detType=detType).astype(bool)
         
@@ -694,7 +694,7 @@ def sumCSPAD( cspad, cspadMask=None, detType ='CSPAD' ):
         
     return theSum
 
-def CSPADgeometry( experiment='xppl2816' , run=72, detType = 'CSPAD' ):
+def CSPADgeometry( experiment='xppl2816' , run=72, detType = 'Jungfrau' ):
     """
     Outputs x,y pixel coords of CSPAD
     """
@@ -706,7 +706,7 @@ def CSPADgeometry( experiment='xppl2816' , run=72, detType = 'CSPAD' ):
 # CSPAD mask generation
 #################################################################################################
         
-def createMask( experiment='xppl2816' , run=72, detType ='CSPAD' ):
+def createMask( experiment='xppl2816' , run=72, detType ='Jungfrau' ):
     """
     Generates a mask of the CSPAD using a combination of the bad tiles, edges, and unbonded pixels.
     Also includes neighbors of the above.
@@ -716,16 +716,19 @@ def createMask( experiment='xppl2816' , run=72, detType ='CSPAD' ):
     evt0 = ds.events().next()
     if detType == 'CSPAD':
         detName = 'cspad'
+        mbits = 37
     elif detType == 'Jungfrau':
         detName = 'jungfrau4M'
+        mbits = 1
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
-        
+    
     CSPADStream=Detector( detName )
-    CSPAD_mask_geo=CSPADStream.mask_comb(evt0,mbits=37)
+    
+#     CSPAD_mask_geo=CSPADStream.mask_comb(evt0,mbits=mbits)
+    CSPAD_mask_geo=CSPADStream.mask(evt0, status=True, calib=True)
     CSPAD_mask_bad_pixels=np.multiply(CSPAD_mask_geo,CSPADStream.mask_geo(evt0,mbits=15))
     CSPAD_mask_edges=CSPADStream.mask_edges(CSPAD_mask_bad_pixels,mrows=4,mcols=4)
-    
     return CSPAD_mask_edges
 
 
