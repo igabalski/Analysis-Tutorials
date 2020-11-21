@@ -149,7 +149,7 @@ class batchPointDataGrabber (threading.Thread):
         self.batchRank = rank
 
         # Specify batch job parameters
-        self.RunType = 'mpirun python2'
+        self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 1000
         self.Queue = 'psnehq'
@@ -271,16 +271,22 @@ class batchPointDataGrabber (threading.Thread):
 # CSPAD grabber (mean and variance done in different batch jobs)
 #################################################################################################
 
-def batchMeanCSPAD(node, experiment = 'xppl2816', runNumber = 72):
+def batchMeanCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='Jungfrau'):
     tagDict = load_obj( BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,runNumber) )
     seconds, nanoseconds, fiducials = tagDict['seconds'], tagDict['nanoseconds'], tagDict['fiducials']
 
     ds = DataSource('exp=%s:run=%d:idx' % (experiment, runNumber))
     run = ds.runs().next()
 
-    cspadMask = createMask( experiment=experiment , run=runNumber).astype(bool)
-
-    integratedCSPAD = np.zeros((32,185,388))
+    cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
+    
+    if detType=='CSPAD':
+        integratedCSPAD = np.zeros((32,185,388))
+    elif detType=='Jungfrau':
+        integratedCSPAD = np.zeros((8,512,1024))
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+    
     count = 0
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
@@ -289,7 +295,7 @@ def batchMeanCSPAD(node, experiment = 'xppl2816', runNumber = 72):
                              seconds=sec, nanoseconds=nsec, fiducials=fid)
 #         ipmIntensity = getIPM(evt,run=runNumber, experiment=experiment,
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
-        ipmIntensity = sumCSPAD( currCSPAD , cspadMask )
+        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
                 integratedCSPAD += currCSPAD / ipmIntensity
                 count += 1
@@ -297,7 +303,7 @@ def batchMeanCSPAD(node, experiment = 'xppl2816', runNumber = 72):
     cspadDict = { 'mean': integratedCSPAD/count , 'count': count }
     save_obj( cspadDict , BATCHDIR + '/Output/cspadDict-node-%d-run-%d' % (node,runNumber) )
 
-def batchVarianceCSPAD(node, experiment = 'xppl2816', runNumber = 72):
+def batchVarianceCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='Jungfrau'):
     tagDict = load_obj( BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,runNumber) )
     seconds, nanoseconds, fiducials = tagDict['seconds'], tagDict['nanoseconds'], tagDict['fiducials']
 
@@ -314,9 +320,15 @@ def batchVarianceCSPAD(node, experiment = 'xppl2816', runNumber = 72):
     run = ds.runs().next()
 
 
-    cspadMask = createMask( experiment=experiment , run=runNumber).astype(bool)
-
-    varianceCSPAD = np.zeros((32,185,388))
+    cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
+    
+    if detType=='CSPAD':
+        varianceCSPAD = np.zeros((32,185,388))
+    elif detType=='Jungfrau':
+        varianceCSPAD = np.zeros((8,512,1024))
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+    
     count = 0
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
@@ -325,7 +337,7 @@ def batchVarianceCSPAD(node, experiment = 'xppl2816', runNumber = 72):
                               seconds=sec, nanoseconds=nsec, fiducials=fid)
 #         ipmIntensity = getIPM(evt, run=runNumber, experiment=experiment,
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
-        ipmIntensity = sumCSPAD( currCSPAD , cspadMask )
+        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
             varianceCSPAD += (currCSPAD / ipmIntensity - mean)**2
             count += 1
@@ -348,7 +360,7 @@ class batchCSPADGrabber (threading.Thread):
         self.batchRank = len( tagsList )
 
         # Specify batch job parameters
-        self.RunType = 'mpirun python2'
+        self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
         self.Queue = 'psnehq'
@@ -450,10 +462,13 @@ class batchCSPADGrabber (threading.Thread):
 
     def gather(self):
         for node in range(self.batchRank):
-            CSPADdict = load_obj( BATCHDIR + '/Output/cspadDict-node-%d-run-%d' % (node,self.runNumber) )
-            self.CSPAD[:,:,:,node] = CSPADdict['mean']
-            self.counts[node] = CSPADdict['count']
-            self.variance[:,:,:,node] = load_obj( BATCHDIR + '/Output/variance-node-%d-run-%d' % (node,self.runNumber) )
+            try:
+                CSPADdict = load_obj( BATCHDIR + '/Output/cspadDict-node-%d-run-%d' % (node,self.runNumber) )
+                self.CSPAD[:,:,:,node] = CSPADdict['mean']
+                self.counts[node] = CSPADdict['count']
+                self.variance[:,:,:,node] = load_obj( BATCHDIR + '/Output/variance-node-%d-run-%d' % (node,self.runNumber) )
+            except Exception as e:
+                pass
 
 
 
@@ -462,7 +477,7 @@ class batchCSPADGrabber (threading.Thread):
 # CSPAD grabber (mean and variance done in different batch jobs)
 #################################################################################################
 
-def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CSPAD'):
+def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='Jungfrau'):
     tagDict = load_obj( BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,runNumber) )
     seconds, nanoseconds, fiducials = tagDict['seconds'], tagDict['nanoseconds'], tagDict['fiducials']
 
@@ -471,7 +486,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
 
 
     cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
-
+    print detType
     if detType =='CSPAD':
         integratedCSPAD = np.zeros((32,185,388))
     elif detType =='Jungfrau':
@@ -488,8 +503,8 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
         ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
-                integratedCSPAD += currCSPAD / ipmIntensity
-                count += 1
+            integratedCSPAD += currCSPAD / ipmIntensity
+            count += 1
 
     mean = integratedCSPAD/count
 
@@ -520,7 +535,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
 
     variance = varianceCSPAD/count
     cspadDict = { 'mean': integratedCSPAD/count , 'count': count , 'variance': variance }
-
+    
     save_obj( cspadDict , BATCHDIR + '/Output/mean-var-node-%d-run-%d' % (node,runNumber) )
 
 
@@ -536,7 +551,7 @@ class batchCSPADMVGrabber (threading.Thread):
         self.batchRank = len( tagsList )
 
         # Specify batch job parameters
-        self.RunType = 'mpirun python2'
+        self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
         self.Queue = 'psanaq'
@@ -650,7 +665,10 @@ class batchCSPADMVGrabber (threading.Thread):
 
     def gather(self):
         for node in range(self.batchRank):
-            CSPADdict = load_obj( BATCHDIR + '/Output/mean-var-node-%d-run-%d' % (node,self.runNumber) )
-            self.CSPAD[:,:,:,node] = CSPADdict['mean']
-            self.counts[node] = CSPADdict['count']
-            self.variance[:,:,:,node] = CSPADdict['variance']
+            try:
+                CSPADdict = load_obj( BATCHDIR + '/Output/mean-var-node-%d-run-%d' % (node,self.runNumber) )
+                self.CSPAD[:,:,:,node] = CSPADdict['mean']
+                self.counts[node] = CSPADdict['count']
+                self.variance[:,:,:,node] = CSPADdict['variance']
+            except Exception as e:
+                pass
