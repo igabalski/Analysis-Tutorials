@@ -205,6 +205,44 @@ def getTTFltPos( evt, det = None, run=74, experiment='xppl2816', seconds=None, n
         return det(evt)
     except Exception:
         return None
+    
+def getAcqirisSum1( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns the summed acqiris signal in channel 1
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Acqiris sum
+    '''
+    if det is None:
+        det = Detector('Acqiris') 
+ 
+    try:
+        return np.sum(det.waveform(evt)[1,:])
+    except Exception:
+        return None
+
+def getAcqirisSum2( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns the summed acqiris signal in channel 2
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Acqiris sum
+    '''
+    if det is None:
+        det = Detector('Acqiris') 
+ 
+    try:
+        return np.sum(det.waveform(evt)[2,:])
+    except Exception:
+        return None
 
 # @memorizeGet
 def getEbeamCharge( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
