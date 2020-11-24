@@ -199,7 +199,7 @@ def getTTFltPos( evt, det = None, run=74, experiment='xppl2816', seconds=None, n
         The value of the EPICS variable for the current event.
     '''
     if det is None:
-        det = Detector('XPP:TIMETOOL:FLTPOS')
+        det = Detector('Timetool')
         
     try:
         return det(evt)
@@ -493,6 +493,29 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         return output
     except Exception:
         return None
+    
+def getCSPADcalib( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='Jungfrau' ):
+    '''
+    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Per-pixel array of calibrated data intensities.
+    '''
+    if detType == 'CSPAD':
+        det = Detector('cspad')
+    elif detType == 'Jungfrau':
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+    try:
+        output = det.calib(evt)
+        return output
+    except Exception:
+        return None
 
 # @memorizeGet
 def getCSPADsum( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
@@ -559,7 +582,7 @@ def getCSPADcoords( evt, det = None, run=74, experiment='xppl2816', seconds=None
         det = Detector('cspad')
     elif det is 'Jungfrau':
         det = Detector('jungfrau4M')
-    return det.coords_x(evt) , det.coords_y(evt)
+    return det.coords_y(evt) , det.coords_x(evt)
 
 
 #################################################################################################
@@ -763,10 +786,12 @@ def createMask( experiment='xppl2816' , run=72, detType ='Jungfrau' ):
     
     CSPADStream=Detector( detName )
     
-#     CSPAD_mask_geo=CSPADStream.mask_comb(evt0,mbits=mbits)
+# #     CSPAD_mask_geo=CSPADStream.mask_comb(evt0,mbits=mbits)
     CSPAD_mask_geo=CSPADStream.mask(evt0, status=True, calib=True)
-    CSPAD_mask_bad_pixels=np.multiply(CSPAD_mask_geo,CSPADStream.mask_geo(evt0,mbits=15))
-    CSPAD_mask_edges=CSPADStream.mask_edges(CSPAD_mask_bad_pixels,mrows=4,mcols=4)
+#     CSPAD_mask_bad_pixels=np.multiply(CSPAD_mask_geo,CSPADStream.mask_geo(evt0,mbits=15))
+#     CSPAD_mask_edges=CSPADStream.mask_edges(CSPAD_mask_bad_pixels,mrows=4,mcols=4)
+    CSPAD_mask_edges=CSPADStream.mask_edges(CSPAD_mask_geo,mrows=4,mcols=4)
+    
     return CSPAD_mask_edges
 
 
