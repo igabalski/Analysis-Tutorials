@@ -260,7 +260,8 @@ class batchPointDataGrabber (threading.Thread):
             try:
                 detArrays0 = load_obj( BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node, self.runNumber) )
                 for key in self.detArrays.keys():
-                    self.detArrays[key] += detArrays0[key]
+                    self.detArrays[key] = np.append(self.detArrays[key], detArrays0[key])
+#                     self.detArrays[key] += detArrays0[key]
             except Exception as e:
                 pass
 
