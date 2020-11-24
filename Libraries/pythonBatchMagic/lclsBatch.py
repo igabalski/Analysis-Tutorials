@@ -351,7 +351,7 @@ def batchVarianceCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='J
 
 # thread for submitted
 class batchCSPADGrabber (threading.Thread):
-    def __init__(self, tagsList, experiment='xppl2816', runNumber=74):
+    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='Jungfrau'):
         threading.Thread.__init__(self)
 
         # Specify function parameters
@@ -364,7 +364,7 @@ class batchCSPADGrabber (threading.Thread):
         self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
-        self.Queue = 'psnehq'
+        self.Queue = 'psanaq'
         self.OutputName = 'cspadGrabber-run-%d-temp-' % runNumber
 
         # Save internally the batch job ids and run status
@@ -374,8 +374,14 @@ class batchCSPADGrabber (threading.Thread):
 
         # Save the final output
         NT = len( tagsList )
-        self.CSPAD = np.zeros((32,185,388,NT))
-        self.variance = np.zeros((32,185,388,NT))
+        if detType == 'CSPAD':
+            self.CSPAD = np.zeros((32,185,388,NT))
+            self.variance = np.zeros((32,185,388,NT))
+        elif detType =='Jungfrau':
+            self.CSPAD = np.zeros((8,512,1024,NT))
+            self.variance = np.zeros((8,512,1024,NT))
+        else:
+            raise ValueError('detType must be CSPAD or Jungfrau')
         self.counts = np.zeros((NT,1))
 
 
@@ -542,7 +548,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='Ju
 
 # thread for submitted
 class batchCSPADMVGrabber (threading.Thread):
-    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD'):
+    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='Jungfrau'):
         threading.Thread.__init__(self)
 
         # Specify function parameters
