@@ -297,8 +297,8 @@ def batchMeanCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='Jungf
 #                               seconds=sec, nanoseconds=nsec, fiducials=fid)
         ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
-                integratedCSPAD += currCSPAD / ipmIntensity
-                count += 1
+            integratedCSPAD += currCSPAD / ipmIntensity
+            count += 1
 
     cspadDict = { 'mean': integratedCSPAD/count , 'count': count }
     save_obj( cspadDict , BATCHDIR + '/Output/cspadDict-node-%d-run-%d' % (node,runNumber) )
