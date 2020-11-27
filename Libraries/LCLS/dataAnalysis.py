@@ -305,6 +305,25 @@ def getTTAMPL( evt, det = None, run=74, experiment='xppl2816', seconds=None, nan
         return det(evt)
     except Exception:
         return None
+    
+def getWave8( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
+    '''
+    Description: This function takes detector and event. Returns the value of the EPICS variable for the current event (FWHM).
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        The value of the EPICS variable for the current event (FWHM).
+    '''
+    if det is None:
+        det = Detector('CXI:DG2:BMMON:SUM')
+    
+    try:
+        return det(evt)
+    except Exception:
+        return None
 
 # @memorizeGet
 def getTTREFAMPL( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
