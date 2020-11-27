@@ -34,7 +34,7 @@ def unixCMD( cmd ):
         stdoutdata: The output of the command
         stderrdata: Any resulting error. If no error, returns empty string.\
     '''
-    cmd='ssh psana \'%s\'' % cmd
+    cmd='ssh psana \'%s; exit\'' % cmd
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
     (stdoutdata, stderrdata) = process.communicate()
     return stdoutdata, stderrdata
@@ -50,7 +50,7 @@ def bjobs():
         stdoutdata: Current batch jobs running
         stderrdata: Any resulting error. If no error, returns empty string.\
     '''
-    cmd='ssh psana \'bjobs\''
+    cmd='ssh psana \'bjobs; exit\''
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
     (stdoutdata, stderrdata) = process.communicate()
     return stdoutdata, stderrdata
@@ -69,9 +69,9 @@ def bkill( jobid = None , killAll = False ):
     '''
     cmd = ''
     if jobid is not None:
-        cmd='ssh psana \'bkill %s\'' % jobid
+        cmd='ssh psana \'bkill %s; exit\'' % jobid
     if killAll:
-        cmd='ssh psana \'bkill 0\''
+        cmd='ssh psana \'bkill 0; exit\''
 
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
     (stdoutdata, stderrdata) = process.communicate()
@@ -100,7 +100,7 @@ def extractJobId(batchOutput):
     Outputs:
         jobid (string)
     '''
-    m = re.search('<\d*\d>', batchOutput)
+    m = re.search('<\d*>', batchOutput)
     return m.group(0)[1:-1]
 
 def checkjobstatus():
@@ -129,8 +129,6 @@ except KeyError as e:
     raise e
 
 currentUser, error = unixCMD("echo $USER")
-while len(currentUser)==0:
-    currentUser, error = unixCMD("echo $USER")
 currentUser = currentUser.strip()
 print('Current user is '+currentUser+' will output batch to '+os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser)
 BATCHDIR = os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser
@@ -153,7 +151,7 @@ if not os.path.isdir(os.environ['OUTPUTPATH']+'/%s/Batch/Python'% currentUser):
 # Submit batch job function
 #################################################################################################
 
-def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psanaq',OutputName='temp'):
+def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq',OutputName='temp'):
     '''
     Description: Submits a batch job from within python
 
@@ -180,6 +178,12 @@ def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psanaq',Out
     print "Output: " + str(output)
     print "Error: " + str(error)
 
+    print "Deleting the old executable file ..."
+    process = subprocess.Popen(shlex.split("rm %s" % BatchFileName), stdout=subprocess.PIPE)
+    output, error = process.communicate()
+    print "Output: " + str(output)
+    print "Error: " + str(error)
+
 
     # Generate executable python file
     bfile = open(BatchFileName, 'w')
@@ -188,7 +192,7 @@ def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psanaq',Out
     bfile.close()
     
     # Execute batch command
-    BatchCommand="ssh psana \'bsub -n %d -R \"rusage[mem=%d]\" -q %s -o %s %s/Libraries/pythonBatchMagic/BatchWrapper.sh %s %s\'" % \
+    BatchCommand="ssh psana \'bsub -n %d -R \"rusage[mem=%d]\" -q %s -o %s %s/Libraries/pythonBatchMagic/BatchWrapper.sh %s %s; exit\'" % \
                                         (Nodes,Memory,Queue,OutputTo,os.environ['INSTALLPATH'],RunType,BatchFileName)
 
 
@@ -257,7 +261,7 @@ class batchThread (threading.Thread):
         self.RunType = 'python2'
         self.Nodes = 1
         self.Memory = 7000
-        self.Queue = 'psanaq'
+        self.Queue = 'psnehq'
         self.OutputName = 'temp'
 
         # Save internally the batch job id and run status
