@@ -115,29 +115,30 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
     # store that in the dictionary
     nplaced =0
     for nevent, evt in enumerate(ds.events()):
-        print(nplaced,nevent,eventMax)
+        
         if nevent >= eventMax: break
 
         if np.mod( nevent,rank ) != node:
             continue
 
         # Always grab seconds, nanoseconds, fiducials to enable memorization
-        print('sec')
         seconds = getSeconds( evt )
-        print('nsec')
         nanoseconds = getNanoseconds( evt )
-        print('fid')
         fiducials = getFiducials( evt )
+        t0 = time.time()
 
         # Now grab user specified detectors
         for name in detList:
-            print(name)
             getFunc = eval(detDict[name]['get-function'])
             detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
                                                                      run=run, experiment=experiment,
                                                                      seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
+        t1 = time.time()
+        print 'Event: ',nplaced,', Time Elapsed: ',t1-t0
         nplaced = nplaced+1
+        
     print('Done')
+    
     save_obj( detArrays , BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run) )
 
 
@@ -492,9 +493,11 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     if detType =='CSPAD':
         integratedCSPAD = np.zeros((32,185,388))
         varianceCSPAD = np.zeros((32,185,388))
+        det = Detector('cspad')
     elif detType =='Jungfrau':
         integratedCSPAD = np.zeros((8,512,1024))
         varianceCSPAD = np.zeros((8,512,1024))
+        det = Detector('jungfrau4M')
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
     
@@ -503,9 +506,11 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
         evt = run.event(et)
-        print 'Frame: ', count
-        currCSPAD = getCSPAD(evt, run=runNumber, experiment=experiment,
+        t0 = time.time()
+        currCSPAD = getCSPAD(evt, det=det, run=runNumber, experiment=experiment,
                              seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
+        t1 = time.time()
+        print 'Frame: ',count,', Grab Time: ', t1-t0
         ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
         if currCSPAD is not None and ipmIntensity is not None:
             lastmeanCSPAD = integratedCSPAD/max(count,1)
