@@ -202,17 +202,17 @@ def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq'
 
     nerror = 0
     errorMax = 10
-    while ("Warning: job being submitted without an AFS token." not in error):
-        if len(error.strip()) == 0:
-            break
-        time.sleep(5)
-        print "Submitting again: "+BatchCommand
-        process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
-        output, error = process.communicate()
-        nerror += 1
-        if nerror > errorMax:
-            print("Too many rejections")
-            break
+#     while ("Warning: job being submitted without an AFS token." not in error):
+#         if len(error.strip()) == 0:
+#             break
+#         time.sleep(5)
+#         print "Submitting again: "+BatchCommand
+#         process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
+#         output, error = process.communicate()
+#         nerror += 1
+#         if nerror > errorMax:
+#             print("Too many rejections")
+#             break
 
 
     print "Output: " + str(output)
