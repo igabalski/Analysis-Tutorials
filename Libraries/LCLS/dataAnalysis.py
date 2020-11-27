@@ -31,7 +31,7 @@
 import numpy as np
 from psana import *
 import os, sys, pickle
-
+import time
 
 
 #################################################################################################
@@ -480,9 +480,12 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if detType == 'CSPAD':
+    
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
-    elif detType == 'Jungfrau':
+    elif detType == 'Jungfrau' and det is None:
         det = Detector('jungfrau4M')
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
