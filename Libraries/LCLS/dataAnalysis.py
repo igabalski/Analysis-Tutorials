@@ -401,7 +401,7 @@ def getIPM( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanose
         Intensity (float)
     '''
     if det is None:
-        det = Detector('XppSb3_Ipm')
+        det = Detector('CxiDg3_Ipm')
     
     try:
         return det.sum(evt)
