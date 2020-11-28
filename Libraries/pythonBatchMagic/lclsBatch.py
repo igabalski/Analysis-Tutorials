@@ -96,6 +96,7 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
 
     # Generate detList from detDict
     detList = detDict.keys()
+    print detList
 
     # Create empty dictionary to store names of detectors in
     detObjs = {name:'' for name in detList}
@@ -126,8 +127,8 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
         nanoseconds = getNanoseconds( evt )
         fiducials = getFiducials( evt )
         t0 = time.time()
-
         # Now grab user specified detectors
+        det = Detector('jungfrau4M')
         for name in detList:
             getFunc = eval(detDict[name]['get-function'])
             detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
@@ -487,8 +488,8 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     ds = DataSource('exp=%s:run=%d:idx' % (experiment, runNumber))
     run = ds.runs().next()
 
-
-    cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
+#     cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
+    cspadMask = np.ones((8,512,1024)).astype(bool)
     
     if detType =='CSPAD':
         integratedCSPAD = np.zeros((32,185,388))
@@ -500,7 +501,6 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
         det = Detector('jungfrau4M')
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
-    
     count = 0
     print 'Mean and Variance (Welford algorithm)'
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
