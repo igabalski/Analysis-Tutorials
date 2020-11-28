@@ -487,6 +487,61 @@ def getDefault( evt, det, run=74, experiment='xppl2816', seconds=None, nanosecon
     except Exception:
         return None
 
+    
+def getGasPressure( evt, det, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
+    '''
+    Description: This function takes detector and event. Returns the defaultGet.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        defaultGet object (unknown type)
+    '''
+    
+    try:
+        return det(evt)
+    except Exception:
+        return None
+    
+def getXrayOn( evt, det, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
+    '''
+    Description: This function takes detector and event. Returns the defaultGet.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        defaultGet object (unknown type)
+    '''
+    
+    try:
+        evrs = det(evt)
+        return (162 not in evrs) & (163 not in evrs)
+    except Exception:
+        return None
+    
+def getLaserOn( evt, det, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
+    '''
+    Description: This function takes detector and event. Returns the defaultGet.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        defaultGet object (unknown type)
+    '''
+    
+    try:
+        evrs = det(evt)
+        return 183 in evrs
+    except Exception:
+        return None
+    
+    
 # @memorizeGet
 def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='CSPAD' ):
     '''
@@ -510,7 +565,11 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         raise ValueError('detType must be CSPAD or Jungfrau')
         
     try:
-        return det.calib(evt, cmpars=(7,0,0))
+        data = det.calib(evt, cmpars=(7,0,0))
+        data_thres = np.zeros_like(data)
+        inds = np.where(data>350)
+        data_thres[inds] = data[inds]
+        return data_thres
     except Exception:
         return None
 
@@ -526,8 +585,15 @@ def getCSPADsum( evt, det = None, run=74, experiment='xppl2816', seconds=None, n
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         return np.nansum(det.calib(evt, cmpars=(7,0,0)).flatten())
     except Exception:
@@ -544,8 +610,15 @@ def getCSPADrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[0,206:306,462:572]
         roi0 = np.nansum(roi.flatten())
@@ -579,8 +652,15 @@ def getCSPADsum0( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=0
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+    
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -599,8 +679,15 @@ def getCSPADsum1( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=1
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+    
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -619,8 +706,14 @@ def getCSPADsum2( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=2
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -639,8 +732,15 @@ def getCSPADsum3( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=3
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -659,8 +759,15 @@ def getCSPADsum4( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=4
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -699,8 +806,15 @@ def getCSPADsum6( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=6
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -719,8 +833,15 @@ def getCSPADsum7( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=7
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -739,8 +860,15 @@ def getCSPADsum8( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         Per-pixel array of calibrated data intensities.
     '''
     ch=8
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
         return np.nansum(roi.flatten())
@@ -759,8 +887,15 @@ def getCSPADmedian( evt, det = None, run=74, experiment='xppl2816', seconds=None
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
     try:
         return np.nanmedian(det.calib(evt, cmpars=(7,0,0)).flatten())
     except Exception:
