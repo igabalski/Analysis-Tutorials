@@ -128,7 +128,7 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
         fiducials = getFiducials( evt )
         t0 = time.time()
         # Now grab user specified detectors
-        det = Detector('jungfrau4M')
+        
         for name in detList:
             getFunc = eval(detDict[name]['get-function'])
             detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
@@ -525,6 +525,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     cspadDict = { 'mean': integratedCSPAD/float(count) , 'count': count , 'variance': variance }
 
     save_obj( cspadDict , BATCHDIR + '/Output/mean-var-node-%d-run-%d' % (node,runNumber) )
+    print 'Done'
 
 
 # thread for submitted
