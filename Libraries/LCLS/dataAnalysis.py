@@ -638,7 +638,67 @@ def getCSPADrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         roi7 = np.nansum(roi.flatten())
         return [roi0,roi1,roi2,roi3,roi4,roi5,roi6,roi7]
     except Exception:
-        return None    
+        return None
+    
+    
+def getRadialrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Per-pixel array of calibrated data intensities.
+    '''
+    if det is None:
+        det = Detector('cspad')
+        
+    detGeom = np.load('/cds/home/m/mrware/TRXS-dev/TRXS-Run18v3/Template-Notebooks/detgeom.npz')
+    x = detGeom['x'] - 250.9
+    y = detGeom['y'] - 514.56
+    r = np.sqrt(y**2+x**2)
+    rMax = 1e5
+    NR = 20
+    dr = float(rMax)/float(NR)
+    rois = np.arange(NR).astype(float)
+#         image = det.calib(evt, cmpars=(7,0,0), mbits=39)
+    image = det.calib(evt,  mbits=39)
+    for idx in range(NR):
+        roi = image[ (r>idx*dr)&(r< (idx+1)*dr ) ].flatten()
+        print(idx,roi.size)
+            
+        try:
+#             rois[idx] = np.nanmax( roi )
+            roi[(roi < 350) | (roi>2000)] = 0
+            rois[idx] = np.nanmean( roi )
+        except Exception as e:
+            print(e)
+            rois[idx] = 0
+    return rois   
+
+def getPhotonHistogram( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Per-pixel array of calibrated data intensities.
+    '''
+    if det is None:
+        det = Detector('cspad')
+        
+    detGeom = np.load('/cds/home/m/mrware/TRXS-dev/TRXS-Run18v3/Template-Notebooks/detgeom.npz')
+
+    image = det.calib(evt,  mbits=39)
+    roi = image[ ~np.isnan(image) ].flatten()
+    hist,edges = np.histogram(roi, bins=200, range=(0,2000))
+    return hist
+    
     
 def getCSPADsum0( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
     '''
