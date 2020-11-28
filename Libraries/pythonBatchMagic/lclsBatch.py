@@ -110,7 +110,9 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
 
 
     # Create empty dictionary to store
-    detArrays = { name:np.zeros((int(np.ceil(float(eventMax)/float(rank))),1)) for name in detList }
+    NSTORE = int(np.ceil(float(eventMax)/float(rank)))
+#     detArrays = { name:np.zeros((int(np.ceil(float(eventMax)/float(rank))),1)) for name in detList }
+    detArrays = { name:[None for el in range(NSTORE)] for name in detList }
 
     # for each detector (named), use .sum(evt) to grab data stored
     # store that in the dictionary

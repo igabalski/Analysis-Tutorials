@@ -565,7 +565,7 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         raise ValueError('detType must be CSPAD or Jungfrau')
         
     try:
-        data = det.calib(evt, cmpars=(7,0,0))
+        data = det.calib(evt, mbits=39, cmpars=(7,0,0))
         data_thres = np.zeros_like(data)
         inds = np.where(data>350)
         data_thres[inds] = data[inds]
@@ -667,7 +667,7 @@ def getRadialrois( evt, det = None, run=74, experiment='xppl2816', seconds=None,
     image = det.calib(evt,  mbits=39)
     for idx in range(NR):
         roi = image[ (r>idx*dr)&(r< (idx+1)*dr ) ].flatten()
-        print(idx,roi.size)
+#         print(idx,roi.size)
             
         try:
 #             rois[idx] = np.nanmax( roi )
