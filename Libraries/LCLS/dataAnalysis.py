@@ -569,7 +569,8 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         data_thres = np.zeros_like(data)
         inds = np.where(data>350)
         data_thres[inds] = data[inds]
-        return data_thres
+        avg_pixel = np.nanmean(data_thres)
+        return data_thres/avg_pixel
     except Exception:
         return None
 
@@ -620,21 +621,22 @@ def getCSPADrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         raise ValueError('detType must be CSPAD or Jungfrau')
         
     try:
-        roi = det.calib(evt, cmpars=(7,0,0))[0,206:306,462:572]
+        det_image = det.calib(evt, cmpars=(7,0,0))
+        roi = det_image[0,206:306,462:572]
         roi0 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[1,206:306,462:572]
+        roi = det_image[1,206:306,462:572]
         roi1 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[2,206:306,462:572]
+        roi = det_image[2,206:306,462:572]
         roi2 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[3,206:306,462:572]
+        roi = det_image[3,206:306,462:572]
         roi3 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[4,206:306,462:572]
+        roi = det_image[4,206:306,462:572]
         roi4 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[5,206:306,462:572]
+        roi = det_image[5,206:306,462:572]
         roi5 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[6,206:306,462:572]
+        roi = det_image[6,206:306,462:572]
         roi6 = np.nansum(roi.flatten())
-        roi = det.calib(evt, cmpars=(7,0,0))[7,206:306,462:572]
+        roi = det_image[7,206:306,462:572]
         roi7 = np.nansum(roi.flatten())
         return [roi0,roi1,roi2,roi3,roi4,roi5,roi6,roi7]
     except Exception:
