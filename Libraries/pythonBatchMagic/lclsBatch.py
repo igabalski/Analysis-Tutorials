@@ -490,8 +490,26 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     ds = DataSource('exp=%s:run=%d:idx' % (experiment, runNumber))
     run = ds.runs().next()
 
+    # Multiplicative detector mask (Geometry, gain, polarization, hot pixel
 #     cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
-    cspadMask = np.ones((8,512,1024)).astype(bool)
+    cspadMask = np.ones((8,512,1024)).astype(float)
+    import h5py
+
+    corrections_file = '/cds/home/i/igabalsk/TRXS-Run18/Libraries/Corrections.mat'
+
+    corrections = {}
+    with h5py.File(corrections_file, 'r') as f:
+        for key, val in f.items():
+            corrections[key] = np.array(val)
+    for key in corrections.keys():
+        if corrections[key].shape==(1024,512,8):
+            corrections[key]=corrections[key].transpose(2,1,0)
+        elif corrections[key].shape==(1,8*512*1024):
+            corrections[key]=np.reshape(corrections[key], (1024,512,8)).transpose(2,1,0)
+        if corrections[key].shape==(8,512,1024):
+            cspadMask = cspadMask*corrections[key]
+        
+        
     
     if detType =='CSPAD':
         integratedCSPAD = np.zeros((32,185,388))
@@ -509,14 +527,16 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
         et = EventTime(int((sec<<32)|nsec),fid)
         evt = run.event(et)
         t0 = time.time()
-        currCSPAD = getCSPAD(evt, det=det, run=runNumber, experiment=experiment,
-                             seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
+        currCSPAD = getCSPAD(evt, det=det, run=runNumber, experiment=experiment,seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
         t1 = time.time()
         print 'Frame: ',count,', Grab Time: ', t1-t0
-        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
-        if currCSPAD is not None and ipmIntensity is not None:
+        
+        # Apply multiplicative corrections
+        
+        if currCSPAD is not None:
+            currCSPAD = currCSPAD*cspadMask
             lastmeanCSPAD = integratedCSPAD/max(count,1)
-            integratedCSPAD += currCSPAD #/ ipmIntensity
+            integratedCSPAD += currCSPAD 
             thismeanCSPAD = integratedCSPAD/(count+1)
             varianceCSPAD = varianceCSPAD + (currCSPAD-lastmeanCSPAD)*(currCSPAD-thismeanCSPAD)
             count += 1
@@ -532,7 +552,7 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
 
 # thread for submitted
 class batchCSPADMVGrabber (threading.Thread):
-    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD'):
+    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD', timebins=None):
         threading.Thread.__init__(self)
 
         # Specify function parameters
@@ -582,6 +602,10 @@ class batchCSPADMVGrabber (threading.Thread):
 
             save_obj( self.tagsList[node] , BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,self.runNumber) )
             time.sleep(1)
+            if timebins is not None:
+                timebin = timebins[node]
+            else:
+                timebin=0
 
             # Submit CSPAD to batch
             batchJobCV = ['import os',
@@ -590,6 +614,7 @@ class batchCSPADMVGrabber (threading.Thread):
                         'import sys',
                         'sys.path.insert(0, os.environ[\'INSTALLPATH\']+\'/Libraries/pythonBatchMagic\')',
                         'from lclsBatch import *',
+                        'print \'timebin=%.3f ps\' % timebin',
                         'batchMeanVarCSPAD( node=%d, experiment=\'%s\', runNumber=%d,detType=\'%s\' )' % (node, self.experiment,self.runNumber,self.detType)]
             self.submitBatch( batchJobCV , self.OutputName+'CSPAD-%d' % node )
 

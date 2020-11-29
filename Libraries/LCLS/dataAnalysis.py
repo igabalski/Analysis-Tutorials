@@ -567,11 +567,11 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
     try:
         data = det.calib(evt, mbits=39, cmpars=(7,0,0))
         data_thres = np.zeros_like(data)
-        inds = np.where(data>350)
+        inds = np.where((data>350) & (data<10000))
         data_thres[inds] = data[inds]
         avg_pixel = np.nanmean(data_thres)
-        return data_thres/avg_pixel
-    except Exception:
+        return data_thres/np.sum(data_thres)
+    except Exception as e:
         return None
 
 # @memorizeGet
