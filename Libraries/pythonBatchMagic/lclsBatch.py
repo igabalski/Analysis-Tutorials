@@ -615,7 +615,7 @@ class batchCSPADMVGrabber (threading.Thread):
                         'import sys',
                         'sys.path.insert(0, os.environ[\'INSTALLPATH\']+\'/Libraries/pythonBatchMagic\')',
                         'from lclsBatch import *',
-                        'print \'timebin=%.3f ps\' % timebin',
+                        'print \'timebin=%.3f ps\'' % timebin,
                         'batchMeanVarCSPAD( node=%d, experiment=\'%s\', runNumber=%d,detType=\'%s\' )' % (node, self.experiment,self.runNumber,self.detType)]
             self.submitBatch( batchJobCV , self.OutputName+'CSPAD-%d' % node )
 
