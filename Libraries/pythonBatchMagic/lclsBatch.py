@@ -560,6 +560,7 @@ class batchCSPADMVGrabber (threading.Thread):
         self.experiment = experiment
         self.runNumber = runNumber
         self.batchRank = len( tagsList )
+        self.timebins=timebins
 
         # Specify batch job parameters
         self.RunType = 'python2'
@@ -602,8 +603,8 @@ class batchCSPADMVGrabber (threading.Thread):
 
             save_obj( self.tagsList[node] , BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,self.runNumber) )
             time.sleep(1)
-            if timebins is not None:
-                timebin = timebins[node]
+            if self.timebins is not None:
+                timebin = self.timebins[node]
             else:
                 timebin=0
 
