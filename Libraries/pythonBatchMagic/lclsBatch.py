@@ -606,7 +606,7 @@ class batchCSPADMVGrabber (threading.Thread):
             if self.timebins is not None:
                 timebin = self.timebins[node]
             else:
-                timebin=0
+                timebin=-100
 
             # Submit CSPAD to batch
             batchJobCV = ['import os',
