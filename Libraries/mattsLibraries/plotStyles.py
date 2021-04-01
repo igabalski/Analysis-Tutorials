@@ -6,6 +6,7 @@ from fireIce import *
 from mathOperations import *
 from pyTools import *
 import itertools
+from IPython.display import clear_output
 
 ################################################################################
 #~~~~~~~~~Default cycler
@@ -315,6 +316,38 @@ def colorPlot( xData, yData, zData,
                  xLims=xLims, yLims=yLims, showAxes=showAxes, bufferLims=bufferLims)
     
     return cbar
+
+
+
+def plotCSPAD( cspad , x , y, cspadMask=None, zLims = None, divergent=False, NTILE=8, tbin=None,  ROIs=[]):
+    figOpts = {'xLims':[-1e5,1e5],'yLims':[-1e5,1e5],'divergent':divergent, 'xIn':3, 'yIn':3*11.5/14.5}
+    
+    if zLims is not None:
+        figOpts['zLims'] = zLims
+    
+    if tbin is not None:
+        figOpts['zLabel']= '%.2f ps' % tbin
+    
+    for iTile in range(NTILE):
+    
+        if cspadMask is not None:
+            cspadTile = np.copy(cspad[iTile,:,:])
+            tileMask = ~cspadMask[iTile,:,:]
+            cspadTile[tileMask] = 0
+        if ROIs:
+            sign=1
+            for mask in ROIs:
+                print cspadTile.shape, mask[iTile].shape
+                cspadTile[mask[iTile]] = 1000*sign
+                sign*=-1
+        
+        if iTile == 0:
+            newFigure = True
+        else:
+            newFigure = False
+            
+        clear_output()
+        colorPlot( x[iTile,:,:], y[iTile,:,:], cspadTile , newFigure=newFigure, **figOpts);
 
 ################################################################################
 #~~~~~~~~~Colorbar generation

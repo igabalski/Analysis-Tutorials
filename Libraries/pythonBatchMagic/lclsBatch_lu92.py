@@ -4,7 +4,6 @@ import threading
 import time
 import re
 import pickle
-import h5py
 
 try:
     os.environ['OUTPUTPATH']
@@ -43,12 +42,6 @@ except KeyError as e:
     raise e
 
 currentUser, error = unixCMD("echo $USER")
-ntries = 0
-while len(currentUser)==0 and ntries<10:
-    print 'Error getting username, try', ntries
-    time.sleep(5)
-    currentUser, error = unixCMD("echo $USER")
-    ntries +=1
 currentUser = currentUser.strip()
 print('Current user is '+currentUser+' will output batch to '+os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser)
 BATCHDIR = os.environ['OUTPUTPATH'] + '/%s/Batch' % currentUser
@@ -72,7 +65,7 @@ if not os.path.isdir(os.environ['OUTPUTPATH']+'/%s/Batch/Python'% currentUser):
 #################################################################################################
 
 # code for individual nodes
-def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None, rank=None, use_ffb=False):
+def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None, rank=None):
     '''
     Description: This function loads an input dictionary, dynamically generated
     by the point data batch thread class. It then pulls the point data from the
@@ -92,36 +85,17 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
         None. Saves result to os.environ['OUTPUTPATH']+'/Batch/Output/nodePointDataGrabber%d-run-%d' % (node,run)
 
     '''
-    
+
     detDict = load_obj( BATCHDIR +'/Output/detDict-run-%d'%run )
 
     print('Grabbing run %d from experiment %s') % (run , experiment)
     print('Node is %d, rank is %d' % (node, rank))
-    
-    calibrations_file = '/cds/home/i/igabalsk/TRXS-Run18/Libraries/lu92_calibrations.h5'
-
-    calibrations = {}
-    with h5py.File(calibrations_file, 'r') as f:
-        for name, _ in f.items():
-            calibrations[name]=f[name][()]
-    corrections=np.ones((8,512,1024))*calibrations['thomson_correction']*calibrations['geometry_correction']
-    QQ = calibrations['QQ']
-    PHI = calibrations['PHI']
-    binning_indices = load_obj('/cds/home/i/igabalsk/TRXS-Run18/Libraries/binning_indices')
-    radial_binning_indices = load_obj('/cds/home/i/igabalsk/TRXS-Run18/Libraries/radial_binning_indices')
-#     nate_mask = np.load('/cds/data/psdm/cxi/cxilv1118/results/nate/Mask_Jungfrau_57_58.npy')
-#     corrections = corrections*nate_mask
 
     # Create a data source to grab data from
-    if use_ffb:
-        print 'Using FFB nodes'
-        ds = DataSource('exp=%s:run=%d:smd:dir=/reg/d/ffb/%s/%s/xtc:live' % (experiment, run, experiment[:3], experiment))
-    else:
-        ds = DataSource('exp=%s:run=%d:smd' % (experiment , run) )
+    ds = DataSource('exp=%s:run=%d:smd' % (experiment , run) )
 
     # Generate detList from detDict
     detList = detDict.keys()
-    print detList
 
     # Create empty dictionary to store names of detectors in
     detObjs = {name:'' for name in detList}
@@ -132,16 +106,14 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
             detObjs[name] = Detector( detDict[name]['name'] )
         except KeyError as e:
             detObjs[name] = None
-
     # Create empty dictionary to store
     NSTORE = int(np.ceil(float(eventMax)/float(rank)))
-#     detArrays = { name:np.zeros((int(np.ceil(float(eventMax)/float(rank))),1)) for name in detList }
-    detArrays = { name:[None for el in range(NSTORE)] for name in detList }
-    
+    detArrays = { name:np.zeros((NSTORE,1)) for name in detList }
+#     detArrays = { name:[None for el in range(NSTORE)] for name in detList }
+
     # for each detector (named), use .sum(evt) to grab data stored
     # store that in the dictionary
     nplaced =0
-    print 'Getting events...'
     for nevent, evt in enumerate(ds.events()):
         
         if nevent >= eventMax: break
@@ -154,40 +126,122 @@ def nodePointDataGrabber( eventMax=10, experiment='xppl2816', run=74, node=None,
         nanoseconds = getNanoseconds( evt )
         fiducials = getFiducials( evt )
         t0 = time.time()
+
         # Now grab user specified detectors
-        
         for name in detList:
             getFunc = eval(detDict[name]['get-function'])
-            if detDict[name]['get-function'] == 'getQPhirois':
-                detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
-                                                    corrections=corrections, binning_indices=binning_indices)
-                continue
-            elif detDict[name]['get-function'] == 'getRadialrois':
-                detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
-                                                    corrections=corrections, binning_indices=radial_binning_indices)
-                continue
-            data = getFunc( evt, detObjs[name],run=run, experiment=experiment,
-                           seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
-            detArrays[name][nplaced] =  data
-        
-        
+            if nplaced == 0:
+                anArray = getFunc( evt, detObjs[name],
+                                   run=run, experiment=experiment,
+                                   seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
+                try:
+                    nl = len(anArray)
+                    if nl>1:
+                        detArrays[name] = np.zeros((NSTORE,nl))
+                        detArrays[name][nplaced,:] = anArray
+                    else:
+                        detArrays[name][nplaced] = anArray
+                except TypeError as te:
+                    detArrays[name][nplaced] =  anArray
+            else:
+                try:
+                    detArrays[name][nplaced,:] =  getFunc( evt, detObjs[name],
+                                                                         run=run, experiment=experiment,
+                                                                         seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
+                except IndexError as ie:
+                    detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
+                                                                         run=run, experiment=experiment,
+                                                                         seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
         t1 = time.time()
         print 'Event: ',nplaced,', Time Elapsed: ',t1-t0
         nplaced = nplaced+1
         
-    print 'Done processing'
-    print 'Writing file: ',BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run)
+    print('Done')
     
     save_obj( detArrays , BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run) )
-    ntries = 0
-    while ntries<10:
+
+#################################################################################################
+# Point data grabber OLD
+#################################################################################################
+
+# code for individual nodes
+def nodePointDataGrabberOLD( eventMax=10, experiment='xppl2816', run=74, node=None, rank=None):
+    '''
+    Description: This function loads an input dictionary, dynamically generated
+    by the point data batch thread class. It then pulls the point data from the
+    run specified by the dictionary.
+
+    Input:
+        eventMax: Maximum number of events to read (integer)
+            Default: 10
+        experiment: Experiment name (string)
+            Default: xppl2816
+        run: Run number (integer)
+            Default: 74
+        node: Which node is the code running on
+        rank: How many nodes is the batch job running across
+
+    Output:
+        None. Saves result to os.environ['OUTPUTPATH']+'/Batch/Output/nodePointDataGrabber%d-run-%d' % (node,run)
+
+    '''
+
+    detDict = load_obj( BATCHDIR +'/Output/detDict-run-%d'%run )
+
+    print('Grabbing run %d from experiment %s') % (run , experiment)
+    print('Node is %d, rank is %d' % (node, rank))
+
+    # Create a data source to grab data from
+    ds = DataSource('exp=%s:run=%d:smd' % (experiment , run) )
+
+    # Generate detList from detDict
+    detList = detDict.keys()
+
+    # Create empty dictionary to store names of detectors in
+    detObjs = {name:'' for name in detList}
+
+    for name in detList:
+        # gets name of detectors and stores in dictionary
         try:
-            load_obj(BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run))
-            break
-        except:
-            save_obj( detArrays , BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run) )
-            ntries +=1
+            detObjs[name] = Detector( detDict[name]['name'] )
+        except KeyError as e:
+            detObjs[name] = None
+
+
+    # Create empty dictionary to store
+    NSTORE = int(np.ceil(float(eventMax)/float(rank)))
+#     detArrays = { name:np.zeros((int(np.ceil(float(eventMax)/float(rank))),1)) for name in detList }
+    detArrays = { name:[None for el in range(NSTORE)] for name in detList }
+
+    # for each detector (named), use .sum(evt) to grab data stored
+    # store that in the dictionary
+    nplaced =0
+    for nevent, evt in enumerate(ds.events()):
         
+        if nevent >= eventMax: break
+
+        if np.mod( nevent,rank ) != node:
+            continue
+
+        # Always grab seconds, nanoseconds, fiducials to enable memorization
+        seconds = getSeconds( evt )
+        nanoseconds = getNanoseconds( evt )
+        fiducials = getFiducials( evt )
+        t0 = time.time()
+
+        # Now grab user specified detectors
+        for name in detList:
+            getFunc = eval(detDict[name]['get-function'])
+            detArrays[name][nplaced] =  getFunc( evt, detObjs[name],
+                                                                     run=run, experiment=experiment,
+                                                                     seconds=seconds, nanoseconds=nanoseconds, fiducials=fiducials)
+        t1 = time.time()
+        print 'Event: ',nplaced,', Time Elapsed: ',t1-t0
+        nplaced = nplaced+1
+        
+    print('Done')
+    
+    save_obj( detArrays , BATCHDIR + '/Output/nodePointDataGrabber%d-run-%d' % (node,run) )
 
 
 # thread for submitted
@@ -211,8 +265,6 @@ class batchPointDataGrabber (threading.Thread):
         self.Memory = 1000
         self.Queue = 'psnehq'
         self.OutputName = 'pointData-run%d-temp' % runNumber
-        self.use_ffb = False
-        self.suppress_output = False
 
         # Save internally the batch job ids and run status
         self.subthreads = []
@@ -244,7 +296,7 @@ class batchPointDataGrabber (threading.Thread):
                         'import sys',
                         'sys.path.insert(0, os.environ[\'INSTALLPATH\']+\'/Libraries/pythonBatchMagic\')',
                         'from lclsBatch import *',
-                        'nodePointDataGrabber( eventMax=%d, experiment=\'%s\', run=%d, node=%d, rank=%d, use_ffb=%r)' % (self.eventMax, self.experiment,self.runNumber,node,self.batchRank,self.use_ffb)]
+                        'nodePointDataGrabber( eventMax=%d, experiment=\'%s\', run=%d, node=%d, rank=%d)' % (self.eventMax, self.experiment,self.runNumber,node,self.batchRank)]
 
             myBatchThread = batchThread( batchJob )
             myBatchThread.RunType = self.RunType
@@ -252,7 +304,6 @@ class batchPointDataGrabber (threading.Thread):
             myBatchThread.Memory = self.Memory
             myBatchThread.Queue = self.Queue
             myBatchThread.OutputName = self.OutputName+'%d' % node
-            myBatchThread.suppress_output = self.suppress_output
             myBatchThread.start()
             self.subthreads.append( myBatchThread )
 
@@ -334,14 +385,14 @@ class batchPointDataGrabber (threading.Thread):
                 NLOADED += 1
             except IOError:
                 print('Could not read in node %d' % node)
-        
+            
         for key in self.detArrays.keys():
-#             print(self.detArrays[key].shape)
+            print(self.detArrays[key].shape)
             try:
                 NX = self.detArrays[key].size
                 NLENGTH = int(float(self.eventMax)*float(NLOADED)/float(self.batchRank))
                 if NX != NLENGTH:
-                    print('fixing shape of '), key
+                    print('fixing shape')
                     self.detArrays[key] = np.reshape(self.detArrays[key], (NLENGTH, NX/NLENGTH), order='C')
             except ValueError as ve:
                 continue
@@ -552,21 +603,8 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     ds = DataSource('exp=%s:run=%d:idx' % (experiment, runNumber))
     run = ds.runs().next()
 
-    # Multiplicative detector mask (Geometry, gain, polarization, hot pixel
-#     cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
-    cspadMask = np.ones((8,512,1024)).astype(float)
-    import h5py
 
-    corrections_file = '/cds/home/i/igabalsk/TRXS-Run18/Libraries/Corrections.mat'
-
-#     corrections = {}
-#     with h5py.File(corrections_file, 'r') as f:
-#         for key, val in f.items():
-#             corrections[key] = np.array(val)
-#     cspadMask*=corrections['Polarization']
-#     cspadMask*=corrections['Geometry']
-        
-        
+    cspadMask = createMask( experiment=experiment , run=runNumber, detType=detType).astype(bool)
     
     if detType =='CSPAD':
         integratedCSPAD = np.zeros((32,185,388))
@@ -578,22 +616,21 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
         det = Detector('jungfrau4M')
     else:
         raise ValueError('detType must be CSPAD or Jungfrau')
+    
     count = 0
     print 'Mean and Variance (Welford algorithm)'
     for sec,nsec,fid in zip(reversed(seconds.astype(int)),reversed(nanoseconds.astype(int)),reversed(fiducials.astype(int))):
         et = EventTime(int((sec<<32)|nsec),fid)
         evt = run.event(et)
         t0 = time.time()
-        currCSPAD = getCSPAD(evt, det=det, run=runNumber, experiment=experiment,seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
+        currCSPAD = getCSPAD(evt, det=det, run=runNumber, experiment=experiment,
+                             seconds=sec, nanoseconds=nsec, fiducials=fid, detType=detType)
         t1 = time.time()
         print 'Frame: ',count,', Grab Time: ', t1-t0
-        
-        # Apply multiplicative corrections
-        
-        if currCSPAD is not None:
-            currCSPAD = currCSPAD*cspadMask
+        ipmIntensity = sumCSPAD( currCSPAD , cspadMask, detType=detType )
+        if currCSPAD is not None and ipmIntensity is not None:
             lastmeanCSPAD = integratedCSPAD/max(count,1)
-            integratedCSPAD += currCSPAD 
+            integratedCSPAD += currCSPAD #/ ipmIntensity
             thismeanCSPAD = integratedCSPAD/(count+1)
             varianceCSPAD = varianceCSPAD + (currCSPAD-lastmeanCSPAD)*(currCSPAD-thismeanCSPAD)
             count += 1
@@ -604,12 +641,11 @@ def batchMeanVarCSPAD(node, experiment = 'xppl2816', runNumber = 72, detType='CS
     cspadDict = { 'mean': integratedCSPAD/float(count) , 'count': count , 'variance': variance }
 
     save_obj( cspadDict , BATCHDIR + '/Output/mean-var-node-%d-run-%d' % (node,runNumber) )
-    print 'Done'
 
 
 # thread for submitted
 class batchCSPADMVGrabber (threading.Thread):
-    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD', timebins=None):
+    def __init__(self, tagsList, experiment='xppl2816', runNumber=74, detType='CSPAD'):
         threading.Thread.__init__(self)
 
         # Specify function parameters
@@ -617,7 +653,6 @@ class batchCSPADMVGrabber (threading.Thread):
         self.experiment = experiment
         self.runNumber = runNumber
         self.batchRank = len( tagsList )
-        self.timebins=timebins
 
         # Specify batch job parameters
         self.RunType = 'python2'
@@ -660,10 +695,6 @@ class batchCSPADMVGrabber (threading.Thread):
 
             save_obj( self.tagsList[node] , BATCHDIR + '/Output/tagDict-node-%d-run-%d' % (node,self.runNumber) )
             time.sleep(1)
-            if self.timebins is not None:
-                timebin = self.timebins[node]
-            else:
-                timebin=-100
 
             # Submit CSPAD to batch
             batchJobCV = ['import os',
@@ -672,7 +703,6 @@ class batchCSPADMVGrabber (threading.Thread):
                         'import sys',
                         'sys.path.insert(0, os.environ[\'INSTALLPATH\']+\'/Libraries/pythonBatchMagic\')',
                         'from lclsBatch import *',
-                        'print \'timebin=%.3f ps\'' % timebin,
                         'batchMeanVarCSPAD( node=%d, experiment=\'%s\', runNumber=%d,detType=\'%s\' )' % (node, self.experiment,self.runNumber,self.detType)]
             self.submitBatch( batchJobCV , self.OutputName+'CSPAD-%d' % node )
 

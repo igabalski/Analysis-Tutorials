@@ -208,7 +208,8 @@ def getTTFltPos( evt, det = None, run=74, experiment='xppl2816', seconds=None, n
     except Exception:
         return None
 
-def getAcqirisSum1( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    
+def getAcqirisSum0( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
     '''
     Description: This function takes detector and event. Returns the summed acqiris signal in channel 1
     
@@ -224,6 +225,26 @@ def getAcqirisSum1( evt, det = None, run=74, experiment='xppl2816', seconds=None
  
     try:
         return np.sum(det.waveform(evt)[0,:])
+    except Exception:
+        return None
+    
+    
+def getAcqirisSum1( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns the summed acqiris signal in channel 1
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Acqiris sum
+    '''
+    if det is None:
+        det = Detector('Acqiris') 
+ 
+    try:
+        return np.sum(det.waveform(evt)[1,:200])
     except Exception:
         return None
 
@@ -242,7 +263,7 @@ def getAcqirisSum2( evt, det = None, run=74, experiment='xppl2816', seconds=None
         det = Detector('Acqiris') 
  
     try:
-        return np.sum(det.waveform(evt)[1,:])
+        return np.sum(det.waveform(evt)[2,:])
     except Exception:
         return None
     
@@ -345,6 +366,24 @@ def getTTREFAMPL( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
     except Exception:
         return None
 
+def getDiodeTotalIntensity( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
+    '''
+    Description: This function takes detector and event. Returns the value of the EPICS variable for the current event
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        The value of the EPICS variable for the current event (FWHM).
+    '''
+    if det is None:
+        det = Detector('CXI-DG3-BMMON')
+    
+    try:
+        return det.get(evt).TotalIntensity()
+    except Exception:
+        return None
 
 # @memorizeGet
 def getSeconds( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
@@ -422,7 +461,7 @@ def getXrayEnergy( evt, det = None, run=74, experiment='xppl2816', seconds=None,
     try:
         # This is the energy after attenuation
         # Type help(det.get(evt)) in detectors.ipynb to see other options
-        return det.get(evt).f_21_ENRC()
+        return det.get(evt).f_11_ENRC()
     except Exception:
         return None
 
@@ -519,7 +558,7 @@ def getXrayOn( evt, det, run=74, experiment='xppl2816', seconds=None, nanosecond
     
     try:
         evrs = det(evt)
-        return (162 not in evrs) & (163 not in evrs)
+        return (162 not in evrs)
     except Exception:
         return None
     
@@ -543,7 +582,9 @@ def getLaserOn( evt, det, run=74, experiment='xppl2816', seconds=None, nanosecon
     
     
 # @memorizeGet
-def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None, detType='CSPAD' ):
+def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None,
+             nanoseconds=None, fiducials=None, detType='CSPAD',
+            threshold=200):
     '''
     Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
     
@@ -566,11 +607,8 @@ def getCSPAD( evt, det = None, run=74, experiment='xppl2816', seconds=None, nano
         
     try:
         data = det.calib(evt, mbits=39, cmpars=(7,0,0))
-        data_thres = np.zeros_like(data)
-        inds = np.where((data>350) & (data<10000))
-        data_thres[inds] = data[inds]
-        avg_pixel = np.nanmean(data_thres)
-        return data_thres/np.sum(data_thres)
+        data[(data < threshold) | (data>2000)] = 0
+        return data
     except Exception as e:
         return None
 
@@ -643,7 +681,7 @@ def getCSPADrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, 
         return None
     
     
-def getRadialrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+def getRadialrois( evt, det = None, run=74, threshold=100, corrections=None, binning_indices=None ):
     '''
     Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
     
@@ -654,31 +692,145 @@ def getRadialrois( evt, det = None, run=74, experiment='xppl2816', seconds=None,
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
         
-    detGeom = np.load('/cds/home/m/mrware/TRXS-dev/TRXS-Run18v3/Template-Notebooks/detgeom.npz')
-    x = detGeom['x'] - 250.9
-    y = detGeom['y'] - 514.56
-    r = np.sqrt(y**2+x**2)
-    rMax = 1e5
-    NR = 20
-    dr = float(rMax)/float(NR)
-    rois = np.arange(NR).astype(float)
-#         image = det.calib(evt, cmpars=(7,0,0), mbits=39)
-    image = det.calib(evt,  mbits=39)
-    for idx in range(NR):
-        roi = image[ (r>idx*dr)&(r< (idx+1)*dr ) ].flatten()
+    if corrections is None:
+        corrections = np.ones((8,512,1024))
+    if binning_indices is None:
+        binning_indices = load_obj('/cds/home/i/igabalsk/TRXS-Run18/Libraries/radial_binning_indices')
+    
+    
+    Qs, phis = binning_indices.Qs, binning_indices.phis
+    dQ, dphi = binning_indices.dQ, binning_indices.dphi
+    roi_indices = binning_indices.roi_indices
+    
+    rois = np.zeros((len(Qs)))
+    t0 = time.time()
+    image = det.calib(evt, cmpars=(7,0,0),mbits=39)
+    if image is None:
+        return rois
+    t1 = time.time()
+#     print 'grab time: ',t1-t0
+    
+    # Correct for Thomson and Geometry
+    image[(image < threshold) | (image>1000)] = 0.
+    image = image*corrections
+    for qidx, q in enumerate(Qs):
+        roi = image[roi_indices[qidx]]
+        try:
+            rois[qidx]=np.nanmean( roi )
+        except Exception as e:
+            print(e)
+            rois[qidx]=0.
+    t2 = time.time()
+#     print 'bin time: ',t2-t1
+#     print 'roi mean:',np.nanmean(rois)
+    return rois
+
+def getQbinnedrois( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
+    '''
+    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Per-pixel array of calibrated data intensities.
+    '''
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
+        det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
+    QQ = np.load('/cds/home/i/igabalsk/TRXS-Run18/Libraries/QQ.npy')
+    Qmin, Qmax = 0.5, 4.2
+    NQ = 100
+    dQ = float(Qmax-Qmin)/NQ
+    Qs = np.linspace(Qmin,Qmax,NQ)
+    rois = np.zeros(Qs.shape)
+    t0 = time.time()
+    image = det.calib(evt, cmpars=(7,0,0),mbits=39)
+    if image is None:
+        return rois
+    t1 = time.time()
+#     print 'read time: ', t1-t0
+    t2 = time.time()
+    for idx, q in enumerate(Qs):
+        roi = image[ (QQ>q)&(QQ<q+dQ ) ].flatten()
 #         print(idx,roi.size)
             
         try:
 #             rois[idx] = np.nanmax( roi )
-            roi[(roi < 350) | (roi>2000)] = 0
-            rois[idx] = np.nanmean( roi )
+            roi[(roi < 75) | (roi>2000)] = 0
+            rois[idx]=np.nanmean( roi )
         except Exception as e:
             print(e)
-            rois[idx] = 0
-    return rois   
+            rois[idx]=0.0
+    t3 = time.time()
+#     print 'mask time: ',t3-t2
+    rois[rois==np.nan]=0
+    return rois
+
+def getQPhirois( evt, det = None, run=74, threshold=200, corrections=None, binning_indices=None):
+    '''
+    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
+    
+    Input:
+        det: The psana detector object
+        evt: psana event object
+        
+    Output:
+        Per-pixel array of calibrated data intensities.
+    '''
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
+        det = Detector('cspad')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
+        
+    if corrections is None:
+        corrections = np.ones((8,512,1024))
+    if binning_indices is None:
+        binning_indices = load_obj('/cds/home/i/igabalsk/TRXS-Run18/Libraries/binning_indices')
+    
+    
+    Qs, phis = binning_indices.Qs, binning_indices.phis
+    dQ, dphi = binning_indices.dQ, binning_indices.dphi
+    roi_indices = binning_indices.roi_indices
+    
+    rois = np.zeros((len(Qs),len(phis)))
+    image = det.calib(evt, cmpars=(7,0,0),mbits=39)
+    if image is None:
+        return rois
+    # Correct for Thomson and Geometry
+    image[(image < threshold) | (image>2000)] = 0.
+    image[(image >= threshold) & (image<=2000)] = 1.
+    image = image*corrections
+    t4 = time.time()
+    for qidx, q in enumerate(Qs):
+        for phiidx, phi in enumerate(phis):
+            roi = image[roi_indices[qidx][phiidx]]
+            try:
+                rois[qidx,phiidx]=np.nanmean( roi )
+            except Exception as e:
+                print(e)
+                rois[qidx,phiidx]=0.
+    return rois
 
 def getPhotonHistogram( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
     '''
@@ -691,251 +843,19 @@ def getPhotonHistogram( evt, det = None, run=74, experiment='xppl2816', seconds=
     Output:
         Per-pixel array of calibrated data intensities.
     '''
-    if det is None:
+    if det is not None:
+        pass
+    elif detType == 'CSPAD':
         det = Detector('cspad')
-        
-    detGeom = np.load('/cds/home/m/mrware/TRXS-dev/TRXS-Run18v3/Template-Notebooks/detgeom.npz')
+    elif detType == 'Jungfrau' and det is None:
+        det = Detector('jungfrau4M')
+    else:
+        raise ValueError('detType must be CSPAD or Jungfrau')
 
     image = det.calib(evt,  mbits=39)
     roi = image[ ~np.isnan(image) ].flatten()
     hist,edges = np.histogram(roi, bins=200, range=(0,2000))
     return hist
-    
-    
-def getCSPADsum0( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=0
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-    
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum1( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=1
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-    
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum2( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=2
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum3( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=3
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-        
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum4( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=4
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-        
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum5( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=5
-    if det is None:
-        det = Detector('cspad')
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum6( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=6
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-        
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum7( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=7
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-        
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
-    
-def getCSPADsum8( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
-    '''
-    Description: This function takes detector and event. Returns per-pixel array of calibrated data intensities.
-    
-    Input:
-        det: The psana detector object
-        evt: psana event object
-        
-    Output:
-        Per-pixel array of calibrated data intensities.
-    '''
-    ch=8
-    if det is not None:
-        pass
-    elif detType == 'CSPAD':
-        det = Detector('cspad')
-    elif detType == 'Jungfrau' and det is None:
-        det = Detector('jungfrau4M')
-    else:
-        raise ValueError('detType must be CSPAD or Jungfrau')
-        
-    try:
-        roi = det.calib(evt, cmpars=(7,0,0))[ch,206:306,462:572]
-        return np.nansum(roi.flatten())
-    except Exception:
-        return None
 
 # @memorizeGet
 def getCSPADmedian( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None ):
@@ -963,7 +883,7 @@ def getCSPADmedian( evt, det = None, run=74, experiment='xppl2816', seconds=None
     except Exception:
         return None
 
-@memorizeGet
+# @memorizeGet
 def getCSPADcoords( evt, det = None, run=74, experiment='xppl2816', seconds=None, nanoseconds=None, fiducials=None  ):
     '''
     Description: This function takes detector and event. Returns per-pixel arrays of x coordinates and y coordinates.

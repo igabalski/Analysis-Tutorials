@@ -7,6 +7,7 @@ import threading
 import time
 import re
 import pickle
+import numpy as np
 
 #################################################################################################
 # Check for install directory
@@ -119,6 +120,27 @@ def checkjobstatus():
     print stderrdata
     print batchThreads.status
     
+    
+class BinningIndices(object):
+    '''
+    Qs, phis are the lower bounds of the (Q,phi) bins
+    dQ, phi are either floats or arrays of same shape as Qs, phis
+    If they are floats, the bins are uniformly spaced
+    If either of them are arrays, it uses the dQ or dphi value at that particular 
+    index to make the bin.
+    This can be used to produce nonuniform bins (i.e. for Legendre projection)
+    '''
+    def __init__(self,Qs,dQ,phis,dphi,roi_indices):
+        self.Qs = Qs
+        self.dQ = dQ
+        self.phis = phis
+        self.dphi = dphi
+        self.roi_indices = roi_indices
+        self.bin_sizes = np.zeros((len(self.Qs),len(self.phis)),dtype=int)
+        for qidx, q in enumerate(self.Qs):
+            for phiidx, phi in enumerate(self.phis):
+                self.bin_sizes[qidx,phiidx] = (self.roi_indices)[qidx][phiidx][0].shape[0]
+    
 #################################################################################################
 # Directory setup
 #################################################################################################
@@ -151,7 +173,7 @@ if not os.path.isdir(os.environ['OUTPUTPATH']+'/%s/Batch/Python'% currentUser):
 # Submit batch job function
 #################################################################################################
 
-def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq',OutputName='temp'):
+def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq',OutputName='temp',suppress_output=False):
     '''
     Description: Submits a batch job from within python
 
@@ -171,18 +193,20 @@ def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq'
     # Specify output directory
     OutputTo= BATCHDIR + '/Output/'+OutputName+'.out'
     BatchFileName= BATCHDIR +'/Python/'+'%s.py'%OutputName
-
-    print "Deleting the old output file ..."
+    if not suppress_output:
+        print "Deleting the old output file ..."
     process = subprocess.Popen(shlex.split("rm %s" % OutputTo), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    print "Output: " + str(output)
-    print "Error: " + str(error)
-
-    print "Deleting the old executable file ..."
+    if not suppress_output:
+        print "Output: " + str(output)
+        print "Error: " + str(error)
+    if not suppress_output:
+        print "Deleting the old executable file ..."
     process = subprocess.Popen(shlex.split("rm %s" % BatchFileName), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    print "Output: " + str(output)
-    print "Error: " + str(error)
+    if not suppress_output:
+        print "Output: " + str(output)
+        print "Error: " + str(error)
 
 
     # Generate executable python file
@@ -195,28 +219,30 @@ def SubmitBatchJob(Job,RunType='python2',Nodes=32,Memory=7000,Queue='psnehprioq'
     BatchCommand="ssh psana \'bsub -n %d -R \"rusage[mem=%d]\" -q %s -o %s %s/Libraries/pythonBatchMagic/BatchWrapper.sh %s %s; exit\'" % \
                                         (Nodes,Memory,Queue,OutputTo,os.environ['INSTALLPATH'],RunType,BatchFileName)
 
-
-    print "Submitting: "+BatchCommand
+    if not suppress_output:
+        print "Submitting: "+BatchCommand
     process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
     output, error = process.communicate()
 
-#     nerror = 0
-#     errorMax = 10
-#     while ("Warning: job being submitted without an AFS token." not in error):
-#         if len(error.strip()) == 0:
-#             break
-#         time.sleep(5)
-#         print "Submitting again: "+BatchCommand
-#         process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
-#         output, error = process.communicate()
-#         nerror += 1
-#         if nerror > errorMax:
-#             print("Too many rejections")
-#             break
+    nerror = 0
+    errorMax = 10
+    while ("Connection closed by remote host" in error):
+        if len(error.strip()) == 0:
+            break
+        time.sleep(5)
+        if not suppress_output:
+            print "Submitting again: "+BatchCommand
+        process = subprocess.Popen(BatchCommand, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, executable='/bin/bash')
+        output, error = process.communicate()
+        nerror += 1
+        if nerror > errorMax:
+            if not suppress_output:
+                print("Too many rejections")
+            break
 
-
-    print "Output: " + str(output)
-    print "Error: " + str(error)
+    if not suppress_output:
+        print "Output: " + str(output)
+        print "Error: " + str(error)
 
     return extractJobId( str(output) )
 
@@ -263,6 +289,7 @@ class batchThread (threading.Thread):
         self.Memory = 7000
         self.Queue = 'psnehq'
         self.OutputName = 'temp'
+        self.suppress_output = False
 
         # Save internally the batch job id and run status
         self.jobid = None
@@ -278,7 +305,8 @@ class batchThread (threading.Thread):
                                    Nodes=self.Nodes,
                                    Memory=self.Memory,
                                    Queue=self.Queue,
-                                   OutputName=self.OutputName)
+                                   OutputName=self.OutputName,
+                                   suppress_output=self.suppress_output)
 
         forcedStop = False
         time.sleep(10)
